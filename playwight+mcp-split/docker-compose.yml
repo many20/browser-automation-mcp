@@ -1,0 +1,104 @@
+services:
+  chromium:
+    build:
+      context: .
+      dockerfile: Dockerfile.chromium
+      args:
+        VNC_PASSWORD: "${VNC_PASSWORD:-vscode}"
+        NOVNC_PORT: "${NOVNC_PORT:-6080}"
+        VNC_PORT: "${VNC_PORT:-5901}"
+    image: playwright-chromium:latest
+    container_name: playwright-chromium
+    hostname: chromium
+    expose:
+      # CDP port, reachable by the MCP server and nginx containers.
+      - "9223"
+    ports:
+      # noVNC web client
+      - "${NOVNC_PORT:-6080}:6080"
+      # TigerVNC server
+      - "${VNC_PORT:-5901}:5901"
+    environment:
+      - CDP_PORT=9223
+      - VNC_RESOLUTION=${VNC_RESOLUTION:-1920x1080x16}
+      - VNC_PASSWORD=${VNC_PASSWORD:-vscode}
+      - NOVNC_PORT=${NOVNC_PORT:-6080}
+      - VNC_PORT=${VNC_PORT:-5901}
+    init: true
+    # Chromium needs a larger /dev/shm.
+    shm_size: ${SHM_SIZE:-2gb}
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "wget -qO- http://127.0.0.1:9223/json/version >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    networks:
+      - playwright-net
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+      args:
+        PLAYWRIGHT_MCP_VERSION: "${PLAYWRIGHT_MCP_VERSION:-0.0.79}"
+    image: playwright-mcp-server:latest
+    container_name: playwright-mcp-server
+    hostname: mcp
+    expose:
+      # MCP HTTP/SSE port, only reachable by the nginx container.
+      - "8932"
+    environment:
+      - PLAYWRIGHT_MCP_PORT=${PLAYWRIGHT_MCP_PORT:-8931}
+      - CDP_PORT=${CDP_PORT:-9222}
+      - CHROMIUM_HOST=chromium
+      - CHROMIUM_CDP_PORT=9223
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+    init: true
+    depends_on:
+      chromium:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "/bin/sh", "-c", "wget -qO- http://127.0.0.1:8932/mcp >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    networks:
+      - playwright-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: playwright-mcp-nginx
+    hostname: playwright-mcp-nginx
+    ports:
+      # Playwright MCP HTTP/SSE transport
+      - "${PLAYWRIGHT_MCP_PORT:-8931}:8931"
+      # Chrome DevTools Protocol (CDP) for external connections
+      - "${CDP_PORT:-9222}:9222"
+    environment:
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+    command: >
+      /bin/sh -c "envsubst '$$MCP_AUTH_TOKEN' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
+    depends_on:
+      chromium:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+    networks:
+      - playwright-net
+
+networks:
+  playwright-net:
+    driver: bridge

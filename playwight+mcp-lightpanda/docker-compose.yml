@@ -1,0 +1,42 @@
+services:
+  lightpanda:
+    image: lightpanda/browser:nightly
+    container_name: lightpanda-browser
+    hostname: lightpanda
+    expose:
+      # Native MCP HTTP port, reachable by nginx.
+      - "9223"
+    environment:
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    command: >
+      /usr/bin/lightpanda mcp --host 0.0.0.0 --port 9223
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "wget -qO- http://127.0.0.1:9223/mcp || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - lightpanda-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: lightpanda-nginx
+    hostname: lightpanda-nginx
+    ports:
+      # Lightpanda MCP HTTP/SSE transport
+      - "${LIGHTPANDA_MCP_PORT:-8931}:8931"
+    environment:
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+    command: >
+      /bin/sh -c "envsubst '$$MCP_AUTH_TOKEN' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
+    depends_on:
+      - lightpanda
+    networks:
+      - lightpanda-net
+
+networks:
+  lightpanda-net:
+    driver: bridge

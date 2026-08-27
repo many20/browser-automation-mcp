@@ -1,0 +1,42 @@
+services:
+  playwright-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PLAYWRIGHT_MCP_VERSION: "${PLAYWRIGHT_MCP_VERSION:-0.0.79}"
+        VNC_PASSWORD: "${VNC_PASSWORD:-vscode}"
+        NOVNC_PORT: "${NOVNC_PORT:-6080}"
+        VNC_PORT: "${VNC_PORT:-5901}"
+    image: playwright-mcp-desktop:latest
+    container_name: playwright-mcp-desktop
+    hostname: playwright-mcp
+    ports:
+      # Playwright MCP HTTP/SSE transport
+      - "${PLAYWRIGHT_MCP_PORT:-8931}:8931"
+      # noVNC web client
+      - "${NOVNC_PORT:-6080}:6080"
+      # TigerVNC server
+      - "${VNC_PORT:-5901}:5901"
+      # Chrome DevTools Protocol (CDP) for external connections
+      - "${CDP_PORT:-9222}:9222"
+    environment:
+      - PLAYWRIGHT_MCP_PORT=${PLAYWRIGHT_MCP_PORT:-8931}
+      - CDP_PORT=${CDP_PORT:-9222}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - VNC_RESOLUTION=${VNC_RESOLUTION:-1920x1080x16}
+      - VNC_PASSWORD=${VNC_PASSWORD:-vscode}
+      - NOVNC_PORT=${NOVNC_PORT:-6080}
+      - VNC_PORT=${VNC_PORT:-5901}
+    # Playwright docs recommend --init to avoid PID-1 zombie issues.
+    init: true
+    # Chromium needs a larger /dev/shm.
+    shm_size: ${SHM_SIZE:-2gb}
+    stdin_open: true
+    tty: true
+    networks:
+      - playwright-net
+
+networks:
+  playwright-net:
+    driver: bridge

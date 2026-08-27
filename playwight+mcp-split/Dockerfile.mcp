@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+
+# Playwright MCP server (no browser binaries).
+# Connects to a remote Chromium instance via CDP.
+FROM node:22-slim
+
+LABEL org.opencontainers.image.title="Playwright MCP server"
+LABEL org.opencontainers.image.description="Playwright MCP server connecting to a remote Chromium CDP endpoint"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Build args ---------------------------------------------------------------
+ARG PLAYWRIGHT_MCP_VERSION=0.0.79
+
+# --- Runtime env vars ---------------------------------------------------------
+ENV PLAYWRIGHT_MCP_PORT=8931 \
+    PLAYWRIGHT_MCP_HOST=0.0.0.0
+
+# --- Install Playwright MCP server --------------------------------------------
+RUN npm install -g @playwright/mcp@${PLAYWRIGHT_MCP_VERSION} \
+    && npm cache clean --force
+
+# --- MCP startup helper -------------------------------------------------------
+COPY start-mcp.sh /usr/local/bin/start-mcp.sh
+RUN chmod +x /usr/local/bin/start-mcp.sh
+
+EXPOSE 8932
+
+CMD ["/usr/local/bin/start-mcp.sh"]

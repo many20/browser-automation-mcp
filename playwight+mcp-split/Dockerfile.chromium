@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+
+# Playwright Chromium + desktop-lite (VNC/noVNC).
+# This image only runs the headful Chromium browser with remote debugging.
+FROM mcr.microsoft.com/playwright:v1.62.0-noble
+
+LABEL org.opencontainers.image.title="Playwright Chromium with desktop-lite / noVNC"
+LABEL org.opencontainers.image.description="Headful Chromium with remote debugging and noVNC remote desktop"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Build args ---------------------------------------------------------------
+ARG NOVNC_VERSION=1.6.0
+
+ARG VNC_PASSWORD=vscode
+ARG NOVNC_PORT=6080
+ARG VNC_PORT=5901
+ARG USERNAME=root
+
+# --- Runtime env vars ---------------------------------------------------------
+ENV DISPLAY=:1 \
+    VNC_RESOLUTION=1920x1080x16 \
+    VNC_PASSWORD=${VNC_PASSWORD} \
+    NOVNC_PORT=${NOVNC_PORT} \
+    VNC_PORT=${VNC_PORT}
+
+# --- Remove browsers we do not need -------------------------------------------
+RUN rm -rf /ms-playwright/firefox-* /ms-playwright/webkit-*
+
+# --- Install devcontainers desktop-lite feature (TigerVNC + noVNC + Fluxbox) --
+RUN curl -fsSL https://raw.githubusercontent.com/devcontainers/features/main/src/desktop-lite/install.sh \
+    -o /tmp/desktop-lite-install.sh \
+    && chmod +x /tmp/desktop-lite-install.sh \
+    && USERNAME=${USERNAME} \
+    PASSWORD=${VNC_PASSWORD} \
+    WEBPORT=${NOVNC_PORT} \
+    VNCPORT=${VNC_PORT} \
+    NOVNCVERSION=${NOVNC_VERSION} \
+    /tmp/desktop-lite-install.sh \
+    && rm /tmp/desktop-lite-install.sh
+
+# --- Chromium startup helper --------------------------------------------------
+COPY start-chromium.sh /usr/local/bin/start-chromium.sh
+RUN chmod +x /usr/local/bin/start-chromium.sh
+
+EXPOSE 6080 5901 9223
+
+ENTRYPOINT ["/usr/local/share/desktop-init.sh"]
+CMD ["/usr/local/bin/start-chromium.sh"]
