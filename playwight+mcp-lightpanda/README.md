@@ -98,15 +98,15 @@ Lightpanda bietet eigene MCP-Tools für Navigation, Interaktion und Datenextrakt
 
 ### Konfiguration für KI-Agenten via `AGENTS.md`
 
-Damit ein KI-Assistent (z. B. Copilot, Cursor, Roo Code) den Playwright MCP Server gezielt als Browser für Recherchen und Websuchen verwendet, kann eine `AGENTS.md` im Projekt- oder Workspace-Root angelegt bzw. ergänzt werden:
+Damit ein KI-Assistent (z. B. Copilot, Cursor, Roo Code) den **Lightpanda MCP Server** gezielt als Browser für Recherchen und Websuchen verwendet, kann eine `AGENTS.md` im Projekt- oder Workspace-Root angelegt bzw. ergänzt werden:
 
 ```markdown
 # Agent Instructions: Web Search & Browsing
 
 Wenn du nach aktuellen Informationen im Web suchen oder Webseiten aufrufen sollst:
 
-1. Verwende die Playwright MCP-Tools (`browser_navigate`, `browser_snapshot`, `browser_click`, etc.).
+1. Verwende die Lightpanda MCP-Tools (`goto`, `search`, `markdown`, `tree`, `click`, `fill`, etc.).
 2. Nutze für Suchanfragen vorzugsweise schlanke, textbasierte Suchseiten (z. B. `https://html.duckduckgo.com/html/?q=<suchbegriff>` oder `https://lite.duckduckgo.com/lite/`), um Cookie-Banner und lange Ladezeiten zu vermeiden.
-3. Erfasse den Seiteninhalt nach der Navigation mittels `browser_snapshot`.
-4. Klicke bei Bedarf über `browser_click` auf relevante Suchergebnisse (`ref`-IDs aus dem Snapshot) oder navigiere direkt zur Zielseite.
+3. Erfasse den Seiteninhalt nach der Navigation mittels `markdown` oder `tree`.
+4. Klicke bei Bedarf über `click` auf relevante Suchergebnisse (`backendNodeId`- oder `selector`-basiert) oder navigiere direkt zur Zielseite mit `goto`.
 ```
