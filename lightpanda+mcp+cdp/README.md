@@ -12,6 +12,7 @@ Lightpanda ist ein von Grund auf neu entwickelter Headless-Browser für AI Agent
 | Port | Dienst                           |
 | ---- | -------------------------------- |
 | 8931 | Lightpanda MCP HTTP/SSE (`/mcp`) |
+| 8932 | Lightpanda CDP WebSocket         |
 
 ## Authentifizierung
 
@@ -67,6 +68,49 @@ Beispiel-Konfiguration für einen MCP-Client (z. B. VS Code, Claude Desktop, Cur
 
 Lightpanda erzeugt pro MCP-Verbindung eine eigene Browsing-Session (Seite, Cookies, Memory). Über den `Mcp-Session-Id`-Header können Clients eine Session wiederaufnehmen oder gemeinsam nutzen. Siehe [Lightpanda MCP-Dokumentation](https://lightpanda.io/docs/open-source/guides/mcp-server).
 
+## CDP-Server verwenden (Playwright / Puppeteer)
+
+Neben dem MCP-Modus startet das Setup zusätzlich einen **CDP-Server** (`lightpanda serve`). Damit lässt sich Lightpanda wie Chromium über das Chrome DevTools Protocol steuern – z. B. mit Playwright oder Puppeteer.
+
+Der CDP-Endpunkt ist über den nginx-Reverse-Proxy auf Port `8932` erreichbar und **durch denselben Bearer-Token geschützt** wie der MCP-Endpunkt. Ohne gültigen Token antwortet der Endpunkt mit **401 Unauthorized**.
+
+### Beispiel: Playwright
+
+Playwright 1.40+ erlaubt es, HTTP-Header für die CDP-Verbindung mitzugeben:
+
+```js
+const { chromium } = require("playwright-core");
+
+const browser = await chromium.connectOverCDP("http://localhost:8932", {
+  headers: {
+    Authorization: "Bearer dein-sicherer-token",
+  },
+});
+const context = browser.contexts()[0] || (await browser.newContext());
+const page = await context.newPage();
+await page.goto("https://example.com");
+console.log(await page.title());
+await browser.close();
+```
+
+### Beispiel: Puppeteer
+
+Puppeteer nutzt direkt die WebSocket-URL. Da WebSocket-Clients keine benutzerdefinierten HTTP-Header setzen können, wird der Token hier als Query-Parameter übergeben:
+
+```js
+import puppeteer from "puppeteer-core";
+
+const browser = await puppeteer.connect({
+  browserWSEndpoint: "ws://localhost:8932/?token=dein-sicherer-token",
+});
+const page = await browser.newPage();
+await page.goto("https://example.com");
+console.log(await page.title());
+await browser.close();
+```
+
+> **Hinweis:** Der Query-Parameter landet in URLs und möglicherweise in Logs. Sicherer ist daher die Playwright-Variante mit Bearer-Header.
+
 ## Wichtige Hinweise
 
 - Lightpanda ist ein rein headless Browser ohne grafische Oberfläche. Es gibt kein noVNC oder VNC.
@@ -85,6 +129,7 @@ docker compose down
 Alle Werte können über `.env` oder direkt in `docker-compose.yml` geändert werden:
 
 - `LIGHTPANDA_MCP_PORT` – externer Port des Lightpanda MCP-Servers (im nginx-Container)
+- `LIGHTPANDA_CDP_PORT` – externer Port des Lightpanda CDP-Servers (Standard: `9222`)
 - `MCP_AUTH_TOKEN` – Bearer-Token für den MCP-Endpunkt
 - `LIGHTPANDA_DISABLE_TELEMETRY` – auf `true` setzen, um Lightpanda-Telemetrie zu deaktivieren
 

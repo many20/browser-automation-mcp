@@ -1,5 +1,7 @@
+name: ai-mcp-playwright
+
 services:
-  chromium:
+  ai-mcp-playwright-chromium:
     build:
       context: .
       dockerfile: Dockerfile.chromium
@@ -8,8 +10,7 @@ services:
         NOVNC_PORT: "${NOVNC_PORT:-6080}"
         VNC_PORT: "${VNC_PORT:-5901}"
     image: playwright-chromium:latest
-    container_name: playwright-chromium
-    hostname: chromium
+    container_name: ai-mcp-playwright-chromium
     expose:
       # CDP port, reachable by the MCP server and nginx containers.
       - "9223"
@@ -42,29 +43,28 @@ services:
       retries: 15
       start_period: 10s
     networks:
-      - playwright-net
+      - local-ai
 
-  mcp:
+  ai-mcp-playwright-server:
     build:
       context: .
       dockerfile: Dockerfile.mcp
       args:
         PLAYWRIGHT_MCP_VERSION: "${PLAYWRIGHT_MCP_VERSION:-0.0.79}"
     image: playwright-mcp-server:latest
-    container_name: playwright-mcp-server
-    hostname: mcp
+    container_name: ai-mcp-playwright-server
     expose:
       # MCP HTTP/SSE port, only reachable by the nginx container.
       - "8932"
     environment:
       - PLAYWRIGHT_MCP_PORT=${PLAYWRIGHT_MCP_PORT:-8931}
       - CDP_PORT=${CDP_PORT:-9222}
-      - CHROMIUM_HOST=chromium
+      - CHROMIUM_HOST=ai-mcp-playwright-chromium
       - CHROMIUM_CDP_PORT=9223
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
     init: true
     depends_on:
-      chromium:
+      ai-mcp-playwright-chromium:
         condition: service_healthy
     healthcheck:
       test:
@@ -74,12 +74,11 @@ services:
       retries: 15
       start_period: 10s
     networks:
-      - playwright-net
+      - local-ai
 
-  nginx:
+  ai-mcp-playwright-nginx:
     image: nginx:alpine
-    container_name: playwright-mcp-nginx
-    hostname: playwright-mcp-nginx
+    container_name: ai-mcp-playwright-nginx
     ports:
       # Playwright MCP HTTP/SSE transport
       - "${PLAYWRIGHT_MCP_PORT:-8931}:8931"
@@ -92,13 +91,14 @@ services:
     command: >
       /bin/sh -c "envsubst '$$MCP_AUTH_TOKEN' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
     depends_on:
-      chromium:
+      ai-mcp-playwright-chromium:
         condition: service_healthy
-      mcp:
+      ai-mcp-playwright-server:
         condition: service_healthy
     networks:
-      - playwright-net
+      - local-ai
 
 networks:
-  playwright-net:
+  local-ai:
     driver: bridge
+    external: true

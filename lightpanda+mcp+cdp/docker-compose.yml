@@ -1,0 +1,78 @@
+name: ai-mcp-lightpanda
+
+services:
+  ai-mcp-lightpanda:
+    image: lightpanda/browser:nightly
+    container_name: ai-mcp-lightpanda
+    hostname: mcp-lightpanda
+    expose:
+      # Native MCP HTTP port, reachable by nginx.
+      - "9223"
+    environment:
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    command: >
+      /usr/bin/lightpanda mcp --host 0.0.0.0 --port 9223 --obey-robots
+    healthcheck:
+      test:
+        ["CMD", "/bin/bash", "-c", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/9223'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          #cpus: "4"
+          memory: 8g
+    networks:
+      - local-ai
+
+  ai-cdp-lightpanda:
+    image: lightpanda/browser:nightly
+    container_name: ai-cdp-lightpanda
+    expose:
+      # CDP WebSocket port, reachable by nginx only.
+      - "9222"
+    environment:
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    command: >
+      /usr/bin/lightpanda serve --host 0.0.0.0 --port 9222 --obey-robots
+    healthcheck:
+      test:
+        ["CMD", "/bin/bash", "-c", "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/9222'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          #cpus: "4"
+          memory: 8g
+    networks:
+      - local-ai
+
+  ai-mcp-lightpanda-nginx:
+    image: nginx:alpine
+    container_name: ai-mcp-lightpanda-nginx
+    ports:
+      # Lightpanda MCP HTTP/SSE transport
+      - "${LIGHTPANDA_MCP_PORT:-8931}:8931"
+      # Lightpanda CDP/WebSocket transport (token-protected)
+      - "${LIGHTPANDA_CDP_PORT:-8932}:8932"
+    environment:
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+    command: >
+      /bin/sh -c "envsubst '$$MCP_AUTH_TOKEN' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"
+    depends_on:
+      - ai-mcp-lightpanda
+      - ai-cdp-lightpanda
+    networks:
+      - local-ai
+
+networks:
+  local-ai:
+    driver: bridge
+    external: true

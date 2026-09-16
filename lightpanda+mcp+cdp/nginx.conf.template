@@ -11,7 +11,7 @@ http {
         ''      close;
     }
 
-    # Playwright MCP HTTP/SSE endpoint (externally exposed with Basic Auth)
+    # Lightpanda native MCP HTTP/SSE endpoint (externally exposed with Bearer token)
     server {
         listen 0.0.0.0:8931;
         server_name _;
@@ -21,7 +21,7 @@ http {
                 return 401 "Unauthorized\n";
             }
 
-            proxy_pass http://ai-mcp-playwright-server:8932;
+            proxy_pass http://ai-mcp-lightpanda:9223;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -40,27 +40,35 @@ http {
         }
     }
 
-    # Chrome DevTools Protocol endpoint (externally exposed with Basic Auth)
+    # Lightpanda CDP/WebSocket endpoint (externally exposed with Bearer token or ?token=)
     server {
-        listen 0.0.0.0:9222;
+        listen 0.0.0.0:8932;
         server_name _;
 
         location / {
-            if ($http_authorization != "Bearer $MCP_AUTH_TOKEN") {
+            set $auth_ok "no";
+            if ($http_authorization = "Bearer $MCP_AUTH_TOKEN") {
+                set $auth_ok "yes";
+            }
+            if ($arg_token = $MCP_AUTH_TOKEN) {
+                set $auth_ok "yes";
+            }
+            if ($auth_ok != "yes") {
                 return 401 "Unauthorized\n";
             }
 
-            proxy_pass http://ai-mcp-playwright-chromium:9223;
+            proxy_pass http://ai-cdp-lightpanda:9222;
             proxy_http_version 1.1;
-            proxy_set_header Host $host;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
 
+            proxy_buffering off;
+            proxy_cache off;
             proxy_read_timeout 86400s;
             proxy_send_timeout 86400s;
 
-            # WebSocket support required by CDP
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
         }

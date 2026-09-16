@@ -1,5 +1,7 @@
+name: ai-mcp-playwright
+
 services:
-  playwright-mcp:
+  ai-mcp-playwright:
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,8 +11,7 @@ services:
         NOVNC_PORT: "${NOVNC_PORT:-6080}"
         VNC_PORT: "${VNC_PORT:-5901}"
     image: playwright-mcp-desktop:latest
-    container_name: playwright-mcp-desktop
-    hostname: playwright-mcp
+    container_name: ai-mcp-playwright
     ports:
       # Playwright MCP HTTP/SSE transport
       - "${PLAYWRIGHT_MCP_PORT:-8931}:8931"
@@ -35,8 +36,9 @@ services:
     stdin_open: true
     tty: true
     networks:
-      - playwright-net
+      - local-ai
 
 networks:
-  playwright-net:
+  local-ai:
     driver: bridge
+    external: true
